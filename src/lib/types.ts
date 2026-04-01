@@ -122,3 +122,90 @@ export interface MetricData {
   trend?: number
   trendLabel?: string
 }
+
+// Sales & Marketing Hub types
+
+export interface BlogDraft {
+  id: string
+  title: string
+  slug?: string
+  category: string
+  outline?: string
+  draft_body?: string
+  source_url?: string
+  source_title?: string
+  status: 'draft' | 'reviewed' | 'approved' | 'published' | 'rejected'
+  tags?: string[]
+  target_audience?: string
+  word_count?: number
+  reviewed_by?: string
+  review_notes?: string
+  scheduled_date?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface Testimonial {
+  id: string
+  client_name: string
+  client_logo_url?: string
+  quote: string
+  author_name?: string
+  author_role?: string
+  source: string
+  source_url?: string
+  category?: string
+  sentiment_score?: number
+  is_approved: boolean
+  is_featured: boolean
+  captured_at: string
+  created_at: string
+}
+
+export interface CompetitiveIntel {
+  id: string
+  competitor: string
+  intel_type: string
+  title: string
+  summary: string
+  source_url?: string
+  relevance_score: number
+  action_suggested?: string
+  status: 'new' | 'reviewed' | 'actioned' | 'dismissed'
+  reviewed_by?: string
+  created_at: string
+}
+
+export interface SalesLead {
+  id: string
+  company_name: string
+  website?: string
+  industry?: string
+  country?: string
+  employee_count?: string
+  current_payment_provider?: string
+  pain_points?: string[]
+  lead_score: number
+  contact_name?: string
+  contact_email?: string
+  contact_role?: string
+  source?: string
+  stage: string
+  notes?: string
+  enriched_at?: string
+  last_contacted_at?: string
+  created_at: string
+}
+
+export interface ContentCalendarItem {
+  id: string
+  content_type: string
+  title: string
+  description?: string
+  target_date: string
+  status: string
+  assigned_to?: string
+  blog_draft_id?: string
+  channel?: string
+  created_at: string
+}

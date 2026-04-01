@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
+import type { BlogDraft, Testimonial, CompetitiveIntel, SalesLead, ContentCalendarItem } from '@/lib/types'
 
 export function useAlerts() {
   const [alerts, setAlerts] = useState<Record<string, unknown>[]>([])
@@ -147,4 +148,178 @@ export function useReconciliation() {
   }
 
   return { records, loading, addExpected, refetch: fetchRecords }
+}
+
+// Sales & Marketing Hub hooks
+
+export function useBlogDrafts() {
+  const [drafts, setDrafts] = useState<BlogDraft[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const fetchDrafts = useCallback(async () => {
+    const { data } = await supabase
+      .from('devengo_blog_drafts')
+      .select('*')
+      .order('created_at', { ascending: false })
+    setDrafts((data as BlogDraft[]) || [])
+    setLoading(false)
+  }, [])
+
+  useEffect(() => {
+    fetchDrafts()
+    const channel = supabase
+      .channel('blog-drafts-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'devengo_blog_drafts' }, () => {
+        fetchDrafts()
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [fetchDrafts])
+
+  const updateStatus = async (id: string, status: string, reviewNotes?: string) => {
+    const updates: Record<string, unknown> = { status, updated_at: new Date().toISOString() }
+    if (reviewNotes !== undefined) updates.review_notes = reviewNotes
+    await supabase.from('devengo_blog_drafts').update(updates).eq('id', id)
+    setDrafts(prev => prev.map(d => d.id === id ? { ...d, ...updates } as BlogDraft : d))
+  }
+
+  return { drafts, loading, updateStatus, refetch: fetchDrafts }
+}
+
+export function useTestimonials() {
+  const [testimonials, setTestimonials] = useState<Testimonial[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const fetchTestimonials = useCallback(async () => {
+    const { data } = await supabase
+      .from('devengo_testimonials')
+      .select('*')
+      .order('created_at', { ascending: false })
+    setTestimonials((data as Testimonial[]) || [])
+    setLoading(false)
+  }, [])
+
+  useEffect(() => {
+    fetchTestimonials()
+    const channel = supabase
+      .channel('testimonials-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'devengo_testimonials' }, () => {
+        fetchTestimonials()
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [fetchTestimonials])
+
+  const toggleApproved = async (id: string, isApproved: boolean) => {
+    await supabase.from('devengo_testimonials').update({ is_approved: isApproved }).eq('id', id)
+    setTestimonials(prev => prev.map(t => t.id === id ? { ...t, is_approved: isApproved } : t))
+  }
+
+  const toggleFeatured = async (id: string, isFeatured: boolean) => {
+    await supabase.from('devengo_testimonials').update({ is_featured: isFeatured }).eq('id', id)
+    setTestimonials(prev => prev.map(t => t.id === id ? { ...t, is_featured: isFeatured } : t))
+  }
+
+  return { testimonials, loading, toggleApproved, toggleFeatured, refetch: fetchTestimonials }
+}
+
+export function useCompetitiveIntel() {
+  const [intel, setIntel] = useState<CompetitiveIntel[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const fetchIntel = useCallback(async () => {
+    const { data } = await supabase
+      .from('devengo_competitive_intel')
+      .select('*')
+      .order('created_at', { ascending: false })
+    setIntel((data as CompetitiveIntel[]) || [])
+    setLoading(false)
+  }, [])
+
+  useEffect(() => {
+    fetchIntel()
+    const channel = supabase
+      .channel('intel-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'devengo_competitive_intel' }, () => {
+        fetchIntel()
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [fetchIntel])
+
+  const updateStatus = async (id: string, status: string) => {
+    await supabase.from('devengo_competitive_intel').update({ status }).eq('id', id)
+    setIntel(prev => prev.map(i => i.id === id ? { ...i, status } as CompetitiveIntel : i))
+  }
+
+  return { intel, loading, updateStatus, refetch: fetchIntel }
+}
+
+export function useSalesLeads() {
+  const [leads, setLeads] = useState<SalesLead[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const fetchLeads = useCallback(async () => {
+    const { data } = await supabase
+      .from('devengo_sales_leads')
+      .select('*')
+      .order('lead_score', { ascending: false })
+    setLeads((data as SalesLead[]) || [])
+    setLoading(false)
+  }, [])
+
+  useEffect(() => {
+    fetchLeads()
+    const channel = supabase
+      .channel('leads-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'devengo_sales_leads' }, () => {
+        fetchLeads()
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [fetchLeads])
+
+  const updateStage = async (id: string, stage: string) => {
+    await supabase.from('devengo_sales_leads').update({ stage }).eq('id', id)
+    setLeads(prev => prev.map(l => l.id === id ? { ...l, stage } : l))
+  }
+
+  const addLead = async (lead: Partial<SalesLead>) => {
+    const { data } = await supabase.from('devengo_sales_leads').insert(lead).select().single()
+    if (data) setLeads(prev => [data as SalesLead, ...prev])
+  }
+
+  return { leads, loading, updateStage, addLead, refetch: fetchLeads }
+}
+
+export function useContentCalendar() {
+  const [items, setItems] = useState<ContentCalendarItem[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const fetchItems = useCallback(async () => {
+    const { data } = await supabase
+      .from('devengo_content_calendar')
+      .select('*')
+      .order('target_date', { ascending: true })
+    setItems((data as ContentCalendarItem[]) || [])
+    setLoading(false)
+  }, [])
+
+  useEffect(() => {
+    fetchItems()
+    const channel = supabase
+      .channel('calendar-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'devengo_content_calendar' }, () => {
+        fetchItems()
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [fetchItems])
+
+  const addItem = async (item: Partial<ContentCalendarItem>) => {
+    const { data } = await supabase.from('devengo_content_calendar').insert(item).select().single()
+    if (data) setItems(prev => [...prev, data as ContentCalendarItem].sort((a, b) => a.target_date.localeCompare(b.target_date)))
+  }
+
+  return { items, loading, addItem, refetch: fetchItems }
 }

@@ -7,6 +7,8 @@ import {
   Webhook,
   Zap,
   Terminal,
+  Target,
+  FileText,
 } from 'lucide-react'
 import { Separator } from '@/components/ui/separator'
 
@@ -16,6 +18,8 @@ const navItems = [
   { to: '/reconciliation', icon: GitCompare, label: 'Reconciliation' },
   { to: '/webhooks', icon: Webhook, label: 'Webhooks' },
   { to: '/automations', icon: Zap, label: 'Automations' },
+  { to: '/sales', icon: Target, label: 'Sales Hub' },
+  { to: '/content', icon: FileText, label: 'Content Hub' },
   { to: '/playground', icon: Terminal, label: 'Playground' },
 ]
 

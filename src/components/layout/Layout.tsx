@@ -5,7 +5,6 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 
 export function Layout() {
-  const [useMockData, setUseMockData] = useState(true)
   const [alertCount, setAlertCount] = useState(0)
 
   useEffect(() => {
@@ -36,9 +35,9 @@ export function Layout() {
     <div className="flex min-h-screen bg-background">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
-        <Header useMockData={useMockData} onToggleMockData={setUseMockData} alertCount={alertCount} />
+        <Header alertCount={alertCount} />
         <main className="flex-1 p-6">
-          <Outlet context={{ useMockData }} />
+          <Outlet />
         </main>
       </div>
     </div>

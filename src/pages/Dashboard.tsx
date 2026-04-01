@@ -5,19 +5,20 @@ import { ErrorCodeBadge } from '@/components/shared/ErrorCodeBadge'
 import { LiveEventFeed } from '@/components/shared/LiveEventFeed'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Wallet, ArrowUpDown, CheckCircle, Clock, Webhook, AlertTriangle } from 'lucide-react'
+import { Wallet, ArrowUpDown, CheckCircle, Clock, Webhook, AlertTriangle, Target, FileText, Quote, Shield } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { getStats, getPaymentsByHour, getErrorDistribution, mockPayments, mockWebhookEvents } from '@/lib/mock-data'
 import { truncateId, maskIBAN, formatDateShort, formatAmount } from '@/lib/format'
 import { useNavigate } from 'react-router-dom'
-import { useAccounts } from '@/hooks/useDevengo'
-import { useLiveEvents } from '@/hooks/useDevengo'
-import { isConfigured } from '@/lib/devengo'
+import { useAccounts, useLiveEvents } from '@/hooks/useDevengo'
+import { useBlogDrafts, useTestimonials, useCompetitiveIntel, useSalesLeads } from '@/hooks/useSupabase'
+import { useDataMode } from '@/contexts/DataModeContext'
 import type { WebhookEvent } from '@/lib/types'
 
 const COLORS = ['#ef4444', '#3b82f6', '#eab308', '#22c55e', '#06b6d4', '#a855f7']
 
 export default function Dashboard() {
+  const { isLive } = useDataMode()
   const stats = getStats()
   const hourlyData = getPaymentsByHour()
   const errorDist = getErrorDistribution()
@@ -25,12 +26,23 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const { accounts } = useAccounts()
   const { events: liveEvents } = useLiveEvents()
+  const { leads } = useSalesLeads()
+  const { drafts } = useBlogDrafts()
+  const { testimonials } = useTestimonials()
+  const { intel } = useCompetitiveIntel()
 
-  // Merge real account data into stats
+  const salesStats = {
+    newLeads: leads.filter(l => l.stage === 'new').length,
+    pendingDrafts: drafts.filter(d => d.status === 'draft').length,
+    testimonials: testimonials.length,
+    competitiveAlerts: intel.filter(i => i.status === 'new').length,
+  }
+
+  // Real data (used in Live mode)
   const realBalance = accounts.reduce((s, a) => s + (a.balance?.available?.cents || 0), 0)
   const realAccountCount = accounts.filter(a => a.status === 'active').length
 
-  // Convert Supabase events to WebhookEvent format for LiveEventFeed
+  // Convert Supabase events for LiveEventFeed
   const realWebhookEvents: WebhookEvent[] = liveEvents.map(e => ({
     id: e.id as string,
     event_type: e.event_type as string,
@@ -45,24 +57,30 @@ export default function Dashboard() {
     processed: e.processed as boolean,
   }))
 
-  // Use real events if available, otherwise mock
-  const feedEvents = realWebhookEvents.length > 0 ? realWebhookEvents : mockWebhookEvents
+  const feedEvents = isLive && realWebhookEvents.length > 0 ? realWebhookEvents : mockWebhookEvents
 
   return (
     <div className="space-y-6">
-      {/* Metric cards */}
+      {/* Payment operations metrics */}
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        <MetricCard label="Total Accounts" value={isConfigured() && realAccountCount > 0 ? realAccountCount : stats.totalAccounts} icon={<Wallet className="h-5 w-5" />} trend={0} trendLabel={isConfigured() && realBalance > 0 ? formatAmount(realBalance) : 'active'} />
-        <MetricCard label="Payments Today" value={isConfigured() ? liveEvents.filter(e => (e.event_type as string)?.includes('confirmed')).length : stats.paymentsToday} icon={<ArrowUpDown className="h-5 w-5" />} trend={12} trendLabel="vs yesterday" />
+        <MetricCard label="Total Accounts" value={isLive && realAccountCount > 0 ? realAccountCount : stats.totalAccounts} icon={<Wallet className="h-5 w-5" />} trend={0} trendLabel={isLive && realBalance > 0 ? formatAmount(realBalance) : 'active'} />
+        <MetricCard label="Payments Today" value={isLive ? liveEvents.filter(e => (e.event_type as string)?.includes('confirmed')).length : stats.paymentsToday} icon={<ArrowUpDown className="h-5 w-5" />} trend={12} trendLabel="vs yesterday" />
         <MetricCard label="Success Rate" value={`${stats.successRate}%`} icon={<CheckCircle className="h-5 w-5" />} trend={2.1} trendLabel="vs last week" />
         <MetricCard label="Avg Delivery" value={`${stats.avgDeliveryTime}s`} icon={<Clock className="h-5 w-5" />} trend={-5} trendLabel="faster" />
         <MetricCard label="Active Webhooks" value={stats.activeWebhooks} icon={<Webhook className="h-5 w-5" />} />
         <MetricCard label="Pending Recon" value={stats.pendingReconciliation} icon={<AlertTriangle className="h-5 w-5" />} />
       </div>
 
+      {/* Sales & Marketing Quick Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <MetricCard label="New Leads" value={salesStats.newLeads} icon={<Target className="h-5 w-5" />} trendLabel="this week" />
+        <MetricCard label="Blog Drafts" value={salesStats.pendingDrafts} icon={<FileText className="h-5 w-5" />} trendLabel="pending review" />
+        <MetricCard label="Testimonials" value={salesStats.testimonials} icon={<Quote className="h-5 w-5" />} trendLabel="collected" />
+        <MetricCard label="Competitive Alerts" value={salesStats.competitiveAlerts} icon={<Shield className="h-5 w-5" />} trendLabel="new" />
+      </div>
+
       {/* Charts + Live feed */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        {/* Left: Charts */}
         <div className="lg:col-span-3 space-y-6">
           <Card className="bg-card border-border">
             <CardHeader className="pb-2">
@@ -74,10 +92,7 @@ export default function Dashboard() {
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(0 0% 20%)" />
                   <XAxis dataKey="hour" tick={{ fontSize: 11, fill: '#71717a' }} interval={3} />
                   <YAxis tick={{ fontSize: 11, fill: '#71717a' }} />
-                  <Tooltip
-                    contentStyle={{ background: '#18181b', border: '1px solid #27272a', borderRadius: '8px', fontSize: 12 }}
-                    labelStyle={{ color: '#a1a1aa' }}
-                  />
+                  <Tooltip contentStyle={{ background: '#18181b', border: '1px solid #27272a', borderRadius: '8px', fontSize: 12 }} labelStyle={{ color: '#a1a1aa' }} />
                   <Area type="monotone" dataKey="confirmed" stackId="1" stroke="#22c55e" fill="#22c55e" fillOpacity={0.3} />
                   <Area type="monotone" dataKey="pending" stackId="1" stroke="#eab308" fill="#eab308" fillOpacity={0.3} />
                   <Area type="monotone" dataKey="failed" stackId="1" stroke="#ef4444" fill="#ef4444" fillOpacity={0.3} />
@@ -95,9 +110,7 @@ export default function Dashboard() {
                 <ResponsiveContainer width={180} height={180}>
                   <PieChart>
                     <Pie data={errorDist} cx="50%" cy="50%" innerRadius={50} outerRadius={80} dataKey="value" paddingAngle={2}>
-                      {errorDist.map((_, i) => (
-                        <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                      ))}
+                      {errorDist.map((_, i) => (<Cell key={i} fill={COLORS[i % COLORS.length]} />))}
                     </Pie>
                     <Tooltip contentStyle={{ background: '#18181b', border: '1px solid #27272a', borderRadius: '8px', fontSize: 12 }} />
                   </PieChart>
@@ -116,7 +129,6 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        {/* Right: Live feed */}
         <div className="lg:col-span-2">
           <Card className="bg-card border-border h-full">
             <CardContent className="p-4">
@@ -146,11 +158,7 @@ export default function Dashboard() {
             </TableHeader>
             <TableBody>
               {recentPayments.map((p) => (
-                <TableRow
-                  key={p.id}
-                  className="border-border cursor-pointer hover:bg-secondary/50 transition-colors"
-                  onClick={() => navigate('/payments')}
-                >
+                <TableRow key={p.id} className="border-border cursor-pointer hover:bg-secondary/50 transition-colors" onClick={() => navigate('/payments')}>
                   <TableCell className="font-mono text-xs">{truncateId(p.id)}</TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">{maskIBAN(p.source_iban)}</TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">{maskIBAN(p.destination_iban)}</TableCell>

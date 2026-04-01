@@ -2,25 +2,47 @@
   "name": "Devengo — Weekly Competitive Monitor",
   "nodes": [
     {
-      "parameters": { "rule": { "interval": [{ "triggerAtHour": 9, "triggerAtDay": 1 }] } },
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 9,
+              "triggerAtDay": 1
+            }
+          ]
+        }
+      },
       "id": "cron",
       "name": "Monday 09:00 CET",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [220, 300]
+      "position": [
+        220,
+        300
+      ]
     },
     {
       "parameters": {
         "url": "https://svujoznxajtzlhzslenf.supabase.co/rest/v1/devengo_webhook_events?select=event_type,status&received_at=gte.{{ $now.minus(7, 'days').toISO() }}",
         "sendHeaders": true,
-        "headerParameters": { "parameters": [{ "name": "apikey", "value": "={{ $credentials.supabaseApiKey }}" }] },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $credentials.supabaseApiKey }}"
+            }
+          ]
+        },
         "options": {}
       },
       "id": "get-internal-stats",
       "name": "Get Internal Stats (7d)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [440, 300]
+      "position": [
+        440,
+        300
+      ]
     },
     {
       "parameters": {
@@ -30,7 +52,10 @@
       "name": "Compile Report",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [660, 300]
+      "position": [
+        660,
+        300
+      ]
     },
     {
       "parameters": {
@@ -44,14 +69,57 @@
       "name": "Send Briefing",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
-      "position": [880, 300]
+      "position": [
+        880,
+        300
+      ]
     }
   ],
   "connections": {
-    "Monday 09:00 CET": { "main": [[ { "node": "Get Internal Stats (7d)", "type": "main", "index": 0 } ]] },
-    "Get Internal Stats (7d)": { "main": [[ { "node": "Compile Report", "type": "main", "index": 0 } ]] },
-    "Compile Report": { "main": [[ { "node": "Send Briefing", "type": "main", "index": 0 } ]] }
+    "Monday 09:00 CET": {
+      "main": [
+        [
+          {
+            "node": "Get Internal Stats (7d)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Internal Stats (7d)": {
+      "main": [
+        [
+          {
+            "node": "Compile Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compile Report": {
+      "main": [
+        [
+          {
+            "node": "Send Briefing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
-  "settings": { "executionOrder": "v1" },
-  "tags": [{ "name": "devengo" }, { "name": "competitive" }]
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "devengo"
+    },
+    {
+      "name": "competitive"
+    }
+  ],
+  "id": "cca8f294acb84fcf92e0"
 }

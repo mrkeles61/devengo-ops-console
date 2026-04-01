@@ -43,6 +43,10 @@ const N8N_WORKFLOWS = [
   { name: 'Bulk Payment Processor', file: 'bulk-payment-processor.json', trigger: 'Webhook', icon: '📦', nodes: 10, description: 'Processes payment batches with validation, rate limiting (10/batch), error handling, and completion reporting.' },
   { name: 'Competitive Rate Monitor', file: 'rate-monitor.json', trigger: 'Cron Mon 09:00', icon: '📈', nodes: 4, description: 'Weekly competitive briefing with internal success rates vs competitor landscape analysis.' },
   { name: 'Balance Sweep Automation', file: 'balance-sweep.json', trigger: 'Cron 30min', icon: '💰', nodes: 9, description: 'Monitors account balances against configurable rules — auto-sweeps excess funds, alerts on low balances.' },
+  { name: 'Fintech News Monitor', file: 'fintech-news-monitor.json', trigger: 'Cron 07:00', icon: '📰', nodes: 7, description: 'Scans Google News for instant payments, SEPA regulation, and A2A payments. Generates blog draft outlines with Devengo-angle positioning.' },
+  { name: 'Social Proof Collector', file: 'social-proof-collector.json', trigger: 'Cron 6h', icon: '⭐', nodes: 6, description: 'Monitors Twitter, LinkedIn, and review sites for Devengo mentions. Filters for testimonial-quality quotes and stores for approval.' },
+  { name: 'Competitive Intelligence Radar', file: 'competitive-intel-radar.json', trigger: 'Cron 08:00', icon: '🔍', nodes: 8, description: 'Tracks GoCardless, Stripe, Volt, Modulr, and Token.io. Scores relevance 1-5 and generates action suggestions for each alert.' },
+  { name: 'Lead Enrichment Pipeline', file: 'lead-enrichment.json', trigger: 'Webhook', icon: '🎯', nodes: 10, description: 'Enriches new leads with website scraping, tech stack detection, pain point mapping, and 0-100 lead scoring algorithm.' },
 ]
 
 export default function Automations() {
@@ -244,7 +248,7 @@ export default function Automations() {
               </CardHeader>
               <CardContent>
                 <p className="text-xs text-muted-foreground mb-4">
-                  7 ready-to-import n8n workflows. Install n8n (<code className="text-[11px] bg-secondary px-1.5 py-0.5 rounded">npx n8n</code>), import the JSON files, configure Devengo API credentials, and they start running.
+                  {N8N_WORKFLOWS.length} ready-to-import n8n workflows. Install n8n (<code className="text-[11px] bg-secondary px-1.5 py-0.5 rounded">npx n8n</code>), import the JSON files, configure Devengo API credentials, and they start running.
                 </p>
                 <div className="space-y-3">
                   {N8N_WORKFLOWS.map(wf => (

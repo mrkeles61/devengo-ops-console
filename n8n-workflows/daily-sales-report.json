@@ -2,51 +2,92 @@
   "name": "Devengo — Daily Sales Report",
   "nodes": [
     {
-      "parameters": { "rule": { "interval": [{ "triggerAtHour": 8 }] } },
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
       "id": "cron-trigger",
       "name": "Every Day 08:00 CET",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [220, 300]
+      "position": [
+        220,
+        300
+      ]
     },
     {
       "parameters": {
         "url": "https://api.sandbox.devengo.com/v1/accounts",
         "sendHeaders": true,
-        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "={{ $credentials.devengoHmacAuth }}" }] },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $credentials.devengoHmacAuth }}"
+            }
+          ]
+        },
         "options": {}
       },
       "id": "get-accounts",
       "name": "Get All Accounts",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [440, 200]
+      "position": [
+        440,
+        200
+      ]
     },
     {
       "parameters": {
         "url": "=https://api.sandbox.devengo.com/v1/payments?created_after={{ $now.minus(1, 'day').toISO() }}",
         "sendHeaders": true,
-        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "={{ $credentials.devengoHmacAuth }}" }] },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ $credentials.devengoHmacAuth }}"
+            }
+          ]
+        },
         "options": {}
       },
       "id": "get-payments",
       "name": "Get Yesterday's Payments",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [440, 400]
+      "position": [
+        440,
+        400
+      ]
     },
     {
       "parameters": {
         "url": "https://svujoznxajtzlhzslenf.supabase.co/rest/v1/devengo_reconciliation?select=status&matched_at=gte.{{ $now.minus(1, 'day').startOf('day').toISO() }}",
         "sendHeaders": true,
-        "headerParameters": { "parameters": [{ "name": "apikey", "value": "={{ $credentials.supabaseApiKey }}" }] },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $credentials.supabaseApiKey }}"
+            }
+          ]
+        },
         "options": {}
       },
       "id": "get-recon",
       "name": "Get Reconciliation Stats",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [440, 600]
+      "position": [
+        440,
+        600
+      ]
     },
     {
       "parameters": {
@@ -57,7 +98,10 @@
       "name": "Calculate Stats",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [720, 300]
+      "position": [
+        720,
+        300
+      ]
     },
     {
       "parameters": {
@@ -68,7 +112,10 @@
       "name": "Generate HTML Report",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [940, 300]
+      "position": [
+        940,
+        300
+      ]
     },
     {
       "parameters": {
@@ -82,14 +129,32 @@
       "name": "Email Daily Report",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
-      "position": [1160, 300]
+      "position": [
+        1160,
+        300
+      ]
     },
     {
       "parameters": {
         "method": "POST",
         "url": "https://svujoznxajtzlhzslenf.supabase.co/rest/v1/devengo_daily_digests",
         "sendHeaders": true,
-        "headerParameters": { "parameters": [{ "name": "apikey", "value": "={{ $credentials.supabaseApiKey }}" }, { "name": "Content-Type", "value": "application/json" }, { "name": "Prefer", "value": "return=representation,resolution=merge-duplicates" }] },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $credentials.supabaseApiKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation,resolution=merge-duplicates"
+            }
+          ]
+        },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"digest_date\": \"{{ $now.minus(1, 'day').toFormat('yyyy-MM-dd') }}\",\n  \"total_payments\": {{ $json.total }},\n  \"successful_payments\": {{ $json.confirmed }},\n  \"failed_payments\": {{ $json.failed }},\n  \"total_amount_cents\": {{ Math.round($json.totalVolume * 100) }},\n  \"success_rate\": {{ $json.successRate }},\n  \"top_errors\": {{ JSON.stringify(Object.entries($json.errorCounts).map(([code, count]) => ({code, count}))) }}\n}",
@@ -99,18 +164,111 @@
       "name": "Store in Supabase",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1380, 300]
+      "position": [
+        1380,
+        300
+      ]
     }
   ],
   "connections": {
-    "Every Day 08:00 CET": { "main": [[ { "node": "Get All Accounts", "type": "main", "index": 0 }, { "node": "Get Yesterday's Payments", "type": "main", "index": 0 }, { "node": "Get Reconciliation Stats", "type": "main", "index": 0 } ]] },
-    "Get All Accounts": { "main": [[ { "node": "Calculate Stats", "type": "main", "index": 0 } ]] },
-    "Get Yesterday's Payments": { "main": [[ { "node": "Calculate Stats", "type": "main", "index": 0 } ]] },
-    "Get Reconciliation Stats": { "main": [[ { "node": "Calculate Stats", "type": "main", "index": 0 } ]] },
-    "Calculate Stats": { "main": [[ { "node": "Generate HTML Report", "type": "main", "index": 0 } ]] },
-    "Generate HTML Report": { "main": [[ { "node": "Email Daily Report", "type": "main", "index": 0 } ]] },
-    "Email Daily Report": { "main": [[ { "node": "Store in Supabase", "type": "main", "index": 0 } ]] }
+    "Every Day 08:00 CET": {
+      "main": [
+        [
+          {
+            "node": "Get All Accounts",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Yesterday's Payments",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Reconciliation Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All Accounts": {
+      "main": [
+        [
+          {
+            "node": "Calculate Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Yesterday's Payments": {
+      "main": [
+        [
+          {
+            "node": "Calculate Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Reconciliation Stats": {
+      "main": [
+        [
+          {
+            "node": "Calculate Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Stats": {
+      "main": [
+        [
+          {
+            "node": "Generate HTML Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate HTML Report": {
+      "main": [
+        [
+          {
+            "node": "Email Daily Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Daily Report": {
+      "main": [
+        [
+          {
+            "node": "Store in Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
-  "settings": { "executionOrder": "v1" },
-  "tags": [{ "name": "devengo" }, { "name": "reporting" }]
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "devengo"
+    },
+    {
+      "name": "reporting"
+    }
+  ],
+  "id": "e4ab8fce41d44988a1da"
 }

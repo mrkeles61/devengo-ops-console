@@ -2,25 +2,42 @@
   "name": "Devengo — Invoice Auto-Reconciliation",
   "nodes": [
     {
-      "parameters": { "httpMethod": "POST", "path": "devengo-reconcile", "options": {} },
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "devengo-reconcile",
+        "options": {}
+      },
       "id": "webhook",
       "name": "Incoming Payment Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [220, 300]
+      "position": [
+        220,
+        300
+      ]
     },
     {
       "parameters": {
         "url": "=https://svujoznxajtzlhzslenf.supabase.co/rest/v1/devengo_reconciliation?status=eq.pending&select=*",
         "sendHeaders": true,
-        "headerParameters": { "parameters": [{ "name": "apikey", "value": "={{ $credentials.supabaseApiKey }}" }] },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $credentials.supabaseApiKey }}"
+            }
+          ]
+        },
         "options": {}
       },
       "id": "get-pending",
       "name": "Get Pending Records",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [440, 300]
+      "position": [
+        440,
+        300
+      ]
     },
     {
       "parameters": {
@@ -30,15 +47,29 @@
       "name": "Match Payment to Record",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [660, 300]
+      "position": [
+        660,
+        300
+      ]
     },
     {
       "parameters": {
-        "rules": { "rules": [
-          { "outputIndex": 0, "value": "exact" },
-          { "outputIndex": 1, "value": "partial" },
-          { "outputIndex": 2, "value": "none" }
-        ] },
+        "rules": {
+          "rules": [
+            {
+              "outputIndex": 0,
+              "value": "exact"
+            },
+            {
+              "outputIndex": 1,
+              "value": "partial"
+            },
+            {
+              "outputIndex": 2,
+              "value": "none"
+            }
+          ]
+        },
         "dataType": "string",
         "value": "={{ $json.match_type }}"
       },
@@ -46,14 +77,28 @@
       "name": "Match Result",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3,
-      "position": [880, 300]
+      "position": [
+        880,
+        300
+      ]
     },
     {
       "parameters": {
         "method": "PATCH",
         "url": "=https://svujoznxajtzlhzslenf.supabase.co/rest/v1/devengo_reconciliation?id=eq.{{ $json.record.id }}",
         "sendHeaders": true,
-        "headerParameters": { "parameters": [{ "name": "apikey", "value": "={{ $credentials.supabaseApiKey }}" }, { "name": "Content-Type", "value": "application/json" }] },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $credentials.supabaseApiKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"status\": \"matched\",\n  \"payment_id\": \"{{ $json.payment.payment_id }}\",\n  \"actual_amount_cents\": {{ $json.payment.amount_cents }},\n  \"matched_at\": \"{{ $now.toISO() }}\"\n}",
@@ -63,14 +108,28 @@
       "name": "Mark as Matched",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1100, 140]
+      "position": [
+        1100,
+        140
+      ]
     },
     {
       "parameters": {
         "method": "PATCH",
         "url": "=https://svujoznxajtzlhzslenf.supabase.co/rest/v1/devengo_reconciliation?id=eq.{{ $json.record.id }}",
         "sendHeaders": true,
-        "headerParameters": { "parameters": [{ "name": "apikey", "value": "={{ $credentials.supabaseApiKey }}" }, { "name": "Content-Type", "value": "application/json" }] },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $credentials.supabaseApiKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"status\": \"mismatched\",\n  \"payment_id\": \"{{ $json.payment.payment_id }}\",\n  \"actual_amount_cents\": {{ $json.payment.amount_cents }},\n  \"matched_at\": \"{{ $now.toISO() }}\",\n  \"notes\": \"Amount mismatch: expected {{ $json.record.expected_amount_cents }}, got {{ $json.payment.amount_cents }}\"\n}",
@@ -80,14 +139,28 @@
       "name": "Mark as Partial Match",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1100, 320]
+      "position": [
+        1100,
+        320
+      ]
     },
     {
       "parameters": {
         "method": "POST",
         "url": "https://svujoznxajtzlhzslenf.supabase.co/rest/v1/devengo_alerts",
         "sendHeaders": true,
-        "headerParameters": { "parameters": [{ "name": "apikey", "value": "={{ $credentials.supabaseApiKey }}" }, { "name": "Content-Type", "value": "application/json" }] },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $credentials.supabaseApiKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"alert_type\": \"orphaned_payment\",\n  \"severity\": \"warning\",\n  \"title\": \"Unmatched incoming payment\",\n  \"description\": \"€{{ ($json.payment.amount_cents / 100).toFixed(2) }} received with no matching expected record\",\n  \"payment_id\": \"{{ $json.payment.payment_id }}\"\n}",
@@ -97,14 +170,28 @@
       "name": "Create Orphan Alert",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1100, 500]
+      "position": [
+        1100,
+        500
+      ]
     },
     {
       "parameters": {
         "method": "POST",
         "url": "https://svujoznxajtzlhzslenf.supabase.co/rest/v1/devengo_automation_log",
         "sendHeaders": true,
-        "headerParameters": { "parameters": [{ "name": "apikey", "value": "={{ $credentials.supabaseApiKey }}" }, { "name": "Content-Type", "value": "application/json" }] },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $credentials.supabaseApiKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"automation_name\": \"invoice_reconciliation\",\n  \"status\": \"success\",\n  \"output_data\": { \"match_type\": \"{{ $('Match Payment to Record').first().json.match_type }}\" }\n}",
@@ -114,18 +201,115 @@
       "name": "Log to Automation Log",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1320, 300]
+      "position": [
+        1320,
+        300
+      ]
     }
   ],
   "connections": {
-    "Incoming Payment Webhook": { "main": [[ { "node": "Get Pending Records", "type": "main", "index": 0 } ]] },
-    "Get Pending Records": { "main": [[ { "node": "Match Payment to Record", "type": "main", "index": 0 } ]] },
-    "Match Payment to Record": { "main": [[ { "node": "Match Result", "type": "main", "index": 0 } ]] },
-    "Match Result": { "main": [[ { "node": "Mark as Matched", "type": "main", "index": 0 } ], [ { "node": "Mark as Partial Match", "type": "main", "index": 0 } ], [ { "node": "Create Orphan Alert", "type": "main", "index": 0 } ]] },
-    "Mark as Matched": { "main": [[ { "node": "Log to Automation Log", "type": "main", "index": 0 } ]] },
-    "Mark as Partial Match": { "main": [[ { "node": "Log to Automation Log", "type": "main", "index": 0 } ]] },
-    "Create Orphan Alert": { "main": [[ { "node": "Log to Automation Log", "type": "main", "index": 0 } ]] }
+    "Incoming Payment Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get Pending Records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Pending Records": {
+      "main": [
+        [
+          {
+            "node": "Match Payment to Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Match Payment to Record": {
+      "main": [
+        [
+          {
+            "node": "Match Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Match Result": {
+      "main": [
+        [
+          {
+            "node": "Mark as Matched",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark as Partial Match",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Orphan Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark as Matched": {
+      "main": [
+        [
+          {
+            "node": "Log to Automation Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark as Partial Match": {
+      "main": [
+        [
+          {
+            "node": "Log to Automation Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Orphan Alert": {
+      "main": [
+        [
+          {
+            "node": "Log to Automation Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
-  "settings": { "executionOrder": "v1" },
-  "tags": [{ "name": "devengo" }, { "name": "reconciliation" }]
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "devengo"
+    },
+    {
+      "name": "reconciliation"
+    }
+  ],
+  "id": "20a5721d6e7941ddad42"
 }

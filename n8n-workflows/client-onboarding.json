@@ -12,7 +12,10 @@
       "name": "New Client Form",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [220, 300]
+      "position": [
+        220,
+        300
+      ]
     },
     {
       "parameters": {
@@ -21,16 +24,31 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Content-Type", "value": "application/json" },
-            { "name": "Authorization", "value": "={{ $credentials.devengoHmacAuth }}" }
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ $credentials.devengoHmacAuth }}"
+            }
           ]
         },
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
-            { "name": "name", "value": "={{ $json.company_name }}" },
-            { "name": "tax_id", "value": "={{ $json.tax_id }}" },
-            { "name": "address", "value": "={{ $json.address }}" }
+            {
+              "name": "name",
+              "value": "={{ $json.company_name }}"
+            },
+            {
+              "name": "tax_id",
+              "value": "={{ $json.tax_id }}"
+            },
+            {
+              "name": "address",
+              "value": "={{ $json.address }}"
+            }
           ]
         },
         "options": {}
@@ -39,7 +57,10 @@
       "name": "Create Account Holder",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [440, 300],
+      "position": [
+        440,
+        300
+      ],
       "notesInFlow": true,
       "notes": "POST /v1/account_holders — Creates the legal entity in Devengo. Triggers KYB verification."
     },
@@ -52,7 +73,10 @@
       "name": "Wait for KYB",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [660, 300]
+      "position": [
+        660,
+        300
+      ]
     },
     {
       "parameters": {
@@ -60,7 +84,10 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Authorization", "value": "={{ $credentials.devengoHmacAuth }}" }
+            {
+              "name": "Authorization",
+              "value": "={{ $credentials.devengoHmacAuth }}"
+            }
           ]
         },
         "options": {}
@@ -69,18 +96,27 @@
       "name": "Check KYB Status",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [880, 300]
+      "position": [
+        880,
+        300
+      ]
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": ""
+          },
           "conditions": [
             {
               "id": "kyb-check",
               "leftValue": "={{ $json.status }}",
               "rightValue": "validated",
-              "operator": { "type": "string", "operation": "equals" }
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
             }
           ],
           "combinator": "and"
@@ -90,7 +126,10 @@
       "name": "KYB Validated?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1100, 300]
+      "position": [
+        1100,
+        300
+      ]
     },
     {
       "parameters": {
@@ -99,14 +138,23 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Content-Type", "value": "application/json" },
-            { "name": "Authorization", "value": "={{ $credentials.devengoHmacAuth }}" }
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ $credentials.devengoHmacAuth }}"
+            }
           ]
         },
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
-            { "name": "account_holder_id", "value": "={{ $('Create Account Holder').item.json.id }}" }
+            {
+              "name": "account_holder_id",
+              "value": "={{ $('Create Account Holder').item.json.id }}"
+            }
           ]
         },
         "options": {}
@@ -115,7 +163,10 @@
       "name": "Create IBAN Account",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1320, 200],
+      "position": [
+        1320,
+        200
+      ],
       "notesInFlow": true,
       "notes": "POST /v1/accounts — Creates a new EUR IBAN for the validated entity."
     },
@@ -126,17 +177,35 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Content-Type", "value": "application/json" },
-            { "name": "Authorization", "value": "={{ $credentials.devengoHmacAuth }}" }
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ $credentials.devengoHmacAuth }}"
+            }
           ]
         },
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
-            { "name": "source_account_id", "value": "={{ $json.id }}" },
-            { "name": "destination_iban", "value": "={{ $('New Client Form').item.json.test_iban || 'ES9121000418450200051332' }}" },
-            { "name": "amount_cents", "value": "1" },
-            { "name": "concept", "value": "Devengo onboarding test payment" }
+            {
+              "name": "source_account_id",
+              "value": "={{ $json.id }}"
+            },
+            {
+              "name": "destination_iban",
+              "value": "={{ $('New Client Form').item.json.test_iban || 'ES9121000418450200051332' }}"
+            },
+            {
+              "name": "amount_cents",
+              "value": "1"
+            },
+            {
+              "name": "concept",
+              "value": "Devengo onboarding test payment"
+            }
           ]
         },
         "options": {}
@@ -145,7 +214,10 @@
       "name": "Send €0.01 Test Payment",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1540, 200]
+      "position": [
+        1540,
+        200
+      ]
     },
     {
       "parameters": {
@@ -154,9 +226,18 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "={{ $credentials.supabaseApiKey }}" },
-            { "name": "Content-Type", "value": "application/json" },
-            { "name": "Prefer", "value": "return=representation" }
+            {
+              "name": "apikey",
+              "value": "={{ $credentials.supabaseApiKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
           ]
         },
         "sendBody": true,
@@ -168,7 +249,10 @@
       "name": "Log Success to Supabase",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1760, 200]
+      "position": [
+        1760,
+        200
+      ]
     },
     {
       "parameters": {
@@ -182,7 +266,10 @@
       "name": "Send Welcome Email",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
-      "position": [1980, 200]
+      "position": [
+        1980,
+        200
+      ]
     },
     {
       "parameters": {
@@ -191,8 +278,14 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "={{ $credentials.supabaseApiKey }}" },
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "apikey",
+              "value": "={{ $credentials.supabaseApiKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
@@ -204,7 +297,10 @@
       "name": "Log KYB Failure",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1320, 440]
+      "position": [
+        1320,
+        440
+      ]
     },
     {
       "parameters": {
@@ -218,7 +314,10 @@
       "name": "Alert Sales Team",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
-      "position": [1540, 440]
+      "position": [
+        1540,
+        440
+      ]
     },
     {
       "parameters": {
@@ -230,22 +329,137 @@
       "name": "Respond to Webhook",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [440, 480]
+      "position": [
+        440,
+        480
+      ]
     }
   ],
   "connections": {
-    "New Client Form": { "main": [[ { "node": "Create Account Holder", "type": "main", "index": 0 }, { "node": "Respond to Webhook", "type": "main", "index": 0 } ]] },
-    "Create Account Holder": { "main": [[ { "node": "Wait for KYB", "type": "main", "index": 0 } ]] },
-    "Wait for KYB": { "main": [[ { "node": "Check KYB Status", "type": "main", "index": 0 } ]] },
-    "Check KYB Status": { "main": [[ { "node": "KYB Validated?", "type": "main", "index": 0 } ]] },
-    "KYB Validated?": { "main": [[ { "node": "Create IBAN Account", "type": "main", "index": 0 } ], [ { "node": "Log KYB Failure", "type": "main", "index": 0 } ]] },
-    "Create IBAN Account": { "main": [[ { "node": "Send €0.01 Test Payment", "type": "main", "index": 0 } ]] },
-    "Send €0.01 Test Payment": { "main": [[ { "node": "Log Success to Supabase", "type": "main", "index": 0 } ]] },
-    "Log Success to Supabase": { "main": [[ { "node": "Send Welcome Email", "type": "main", "index": 0 } ]] },
-    "Log KYB Failure": { "main": [[ { "node": "Alert Sales Team", "type": "main", "index": 0 } ]] }
+    "New Client Form": {
+      "main": [
+        [
+          {
+            "node": "Create Account Holder",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Account Holder": {
+      "main": [
+        [
+          {
+            "node": "Wait for KYB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for KYB": {
+      "main": [
+        [
+          {
+            "node": "Check KYB Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check KYB Status": {
+      "main": [
+        [
+          {
+            "node": "KYB Validated?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "KYB Validated?": {
+      "main": [
+        [
+          {
+            "node": "Create IBAN Account",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log KYB Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create IBAN Account": {
+      "main": [
+        [
+          {
+            "node": "Send €0.01 Test Payment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send €0.01 Test Payment": {
+      "main": [
+        [
+          {
+            "node": "Log Success to Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Success to Supabase": {
+      "main": [
+        [
+          {
+            "node": "Send Welcome Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log KYB Failure": {
+      "main": [
+        [
+          {
+            "node": "Alert Sales Team",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
-  "settings": { "executionOrder": "v1" },
+  "settings": {
+    "executionOrder": "v1"
+  },
   "staticData": null,
-  "tags": [{ "name": "devengo" }, { "name": "onboarding" }],
-  "pinData": {}
+  "tags": [
+    {
+      "name": "devengo"
+    },
+    {
+      "name": "onboarding"
+    }
+  ],
+  "pinData": {},
+  "id": "24a71affd70c4c0ebc3f"
 }

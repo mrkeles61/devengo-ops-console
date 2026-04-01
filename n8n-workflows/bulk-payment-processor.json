@@ -2,12 +2,20 @@
   "name": "Devengo — Bulk Payment Processor",
   "nodes": [
     {
-      "parameters": { "httpMethod": "POST", "path": "devengo-bulk-pay", "responseMode": "responseNode", "options": {} },
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "devengo-bulk-pay",
+        "responseMode": "responseNode",
+        "options": {}
+      },
       "id": "webhook",
       "name": "Receive Payment Batch",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [220, 300]
+      "position": [
+        220,
+        300
+      ]
     },
     {
       "parameters": {
@@ -17,7 +25,10 @@
       "name": "Validate Input",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [440, 300]
+      "position": [
+        440,
+        300
+      ]
     },
     {
       "parameters": {
@@ -29,14 +40,28 @@
       "name": "Respond Immediately",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [660, 460]
+      "position": [
+        660,
+        460
+      ]
     },
     {
       "parameters": {
         "method": "POST",
         "url": "https://svujoznxajtzlhzslenf.supabase.co/rest/v1/devengo_automation_log",
         "sendHeaders": true,
-        "headerParameters": { "parameters": [{ "name": "apikey", "value": "={{ $credentials.supabaseApiKey }}" }, { "name": "Content-Type", "value": "application/json" }] },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $credentials.supabaseApiKey }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"automation_name\": \"bulk_payment\",\n  \"status\": \"started\",\n  \"input_data\": { \"batch_id\": \"{{ $json.batchId }}\", \"total\": {{ $json.total }}, \"valid\": {{ $json.validCount }} }\n}",
@@ -46,7 +71,10 @@
       "name": "Log Batch Start",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [660, 200]
+      "position": [
+        660,
+        200
+      ]
     },
     {
       "parameters": {
@@ -56,46 +84,96 @@
       "name": "Split Into Individual Payments",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [880, 200]
+      "position": [
+        880,
+        200
+      ]
     },
     {
-      "parameters": { "batchSize": 10, "options": {} },
+      "parameters": {
+        "batchSize": 10,
+        "options": {}
+      },
       "id": "batch",
       "name": "Process in Batches of 10",
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
-      "position": [1100, 200]
+      "position": [
+        1100,
+        200
+      ]
     },
     {
-      "parameters": { "amount": 1, "unit": "seconds" },
+      "parameters": {
+        "amount": 1,
+        "unit": "seconds"
+      },
       "id": "rate-limit",
       "name": "Rate Limit (1s)",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [1320, 200]
+      "position": [
+        1320,
+        200
+      ]
     },
     {
       "parameters": {
         "method": "POST",
         "url": "https://api.sandbox.devengo.com/v1/payments",
         "sendHeaders": true,
-        "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }, { "name": "Authorization", "value": "={{ $credentials.devengoHmacAuth }}" }] },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ $credentials.devengoHmacAuth }}"
+            }
+          ]
+        },
         "sendBody": true,
         "bodyParameters": {
           "parameters": [
-            { "name": "source_account_id", "value": "={{ $json.source_account_id }}" },
-            { "name": "destination_iban", "value": "={{ $json.destination_iban }}" },
-            { "name": "amount_cents", "value": "={{ $json.amount_cents }}" },
-            { "name": "concept", "value": "={{ $json.concept }}" }
+            {
+              "name": "source_account_id",
+              "value": "={{ $json.source_account_id }}"
+            },
+            {
+              "name": "destination_iban",
+              "value": "={{ $json.destination_iban }}"
+            },
+            {
+              "name": "amount_cents",
+              "value": "={{ $json.amount_cents }}"
+            },
+            {
+              "name": "concept",
+              "value": "={{ $json.concept }}"
+            }
           ]
         },
-        "options": { "redirect": { "redirect": {} }, "response": { "response": { "fullResponse": true } } }
+        "options": {
+          "redirect": {
+            "redirect": {}
+          },
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
       },
       "id": "send-payment",
       "name": "Send Payment",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1540, 200],
+      "position": [
+        1540,
+        200
+      ],
       "continueOnFail": true
     },
     {
@@ -106,7 +184,10 @@
       "name": "Generate Batch Report",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1760, 200]
+      "position": [
+        1760,
+        200
+      ]
     },
     {
       "parameters": {
@@ -120,18 +201,106 @@
       "name": "Email Batch Report",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
-      "position": [1980, 200]
+      "position": [
+        1980,
+        200
+      ]
     }
   ],
   "connections": {
-    "Receive Payment Batch": { "main": [[ { "node": "Validate Input", "type": "main", "index": 0 } ]] },
-    "Validate Input": { "main": [[ { "node": "Log Batch Start", "type": "main", "index": 0 }, { "node": "Respond Immediately", "type": "main", "index": 0 } ]] },
-    "Log Batch Start": { "main": [[ { "node": "Split Into Individual Payments", "type": "main", "index": 0 } ]] },
-    "Split Into Individual Payments": { "main": [[ { "node": "Process in Batches of 10", "type": "main", "index": 0 } ]] },
-    "Process in Batches of 10": { "main": [[ { "node": "Rate Limit (1s)", "type": "main", "index": 0 } ]] },
-    "Rate Limit (1s)": { "main": [[ { "node": "Send Payment", "type": "main", "index": 0 } ]] },
-    "Send Payment": { "main": [[ { "node": "Generate Batch Report", "type": "main", "index": 0 } ]] }
+    "Receive Payment Batch": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Log Batch Start",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Respond Immediately",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Batch Start": {
+      "main": [
+        [
+          {
+            "node": "Split Into Individual Payments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Into Individual Payments": {
+      "main": [
+        [
+          {
+            "node": "Process in Batches of 10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process in Batches of 10": {
+      "main": [
+        [
+          {
+            "node": "Rate Limit (1s)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rate Limit (1s)": {
+      "main": [
+        [
+          {
+            "node": "Send Payment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Payment": {
+      "main": [
+        [
+          {
+            "node": "Generate Batch Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
-  "settings": { "executionOrder": "v1" },
-  "tags": [{ "name": "devengo" }, { "name": "bulk" }]
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "devengo"
+    },
+    {
+      "name": "bulk"
+    }
+  ],
+  "id": "cf8f59bf548247578b64"
 }
