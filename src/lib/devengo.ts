@@ -146,19 +146,28 @@ export function getIban(account: AccountResponse): string {
   return account.identifiers?.find(i => i.type === 'iban')?.iban ?? ''
 }
 
-// ─── Payments ───
+// ─── Payments (Devengo calls them "outgoing payments") ───
 export interface PaymentResponse {
   id: string
-  source_account_id: string
-  destination_iban: string
-  amount: { amount: string; currency: string }
-  concept: string
+  account_id: string
+  destination: { iban: string }
+  amount: { cents: number; currency: string }
+  recipient: string
+  description: string
   status: string
-  error_code?: string
+  instant: boolean
+  eta: string
+  error: { code: string; message: string } | null
+  processor: { network: string; scheme: string }
+  third_party: { name: string; account: { identifiers: { type: string; iban: string }[]; bank: { bic: string; name: string } } }
+  fee: { cents: number; currency: string } | null
+  metadata: Record<string, string>
+  retried: boolean
+  internal: boolean
+  account_holder_id: string
+  company_reference: string | null
   created_at: string
-  confirmed_at?: string
-  failed_at?: string
-  metadata?: Record<string, string>
+  links: { receipt: string } | null
 }
 
 export function listPayments(params?: { page?: number; per_page?: number }) {
@@ -167,25 +176,28 @@ export function listPayments(params?: { page?: number; per_page?: number }) {
 }
 
 export function getPayment(id: string) {
-  return request<PaymentResponse>('GET', `/v1/payments/${id}`)
+  return request<{ payment: PaymentResponse }>('GET', `/v1/payments/${id}`)
 }
 
 export function createPayment(data: {
-  source_account_id: string
-  destination_iban: string
-  amount: { amount: string; currency: string }
-  concept: string
+  account_id: string
+  destination: { iban: string }
+  recipient: string
+  description: string
+  amount: { cents: number; currency: string }
   metadata?: Record<string, string>
 }) {
-  return request<PaymentResponse>('POST', '/v1/payments', data)
+  return request<{ payment: PaymentResponse }>('POST', '/v1/payments', data)
 }
 
 export function previewPayment(data: {
-  source_account_id: string
-  destination_iban: string
-  amount: { amount: string; currency: string }
+  account_id: string
+  destination: { iban: string }
+  recipient: string
+  description: string
+  amount: { cents: number; currency: string }
 }) {
-  return request<{ estimated_delivery_seconds: number; fee: { amount: string; currency: string } }>('POST', '/v1/payments/preview', data)
+  return request<{ preview: { instant: boolean; eta: string; processor: { network: string; scheme: string } } }>('POST', '/v1/payments/preview', data)
 }
 
 // ─── Incoming Payments ───

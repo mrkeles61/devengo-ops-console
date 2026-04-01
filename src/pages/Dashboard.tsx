@@ -8,8 +8,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Wallet, ArrowUpDown, CheckCircle, Clock, Webhook, AlertTriangle } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { getStats, getPaymentsByHour, getErrorDistribution, mockPayments, mockWebhookEvents } from '@/lib/mock-data'
-import { truncateId, maskIBAN, formatDateShort } from '@/lib/format'
+import { truncateId, maskIBAN, formatDateShort, formatAmount } from '@/lib/format'
 import { useNavigate } from 'react-router-dom'
+import { useAccounts } from '@/hooks/useDevengo'
+import { useLiveEvents } from '@/hooks/useDevengo'
+import { isConfigured } from '@/lib/devengo'
+import type { WebhookEvent } from '@/lib/types'
 
 const COLORS = ['#ef4444', '#3b82f6', '#eab308', '#22c55e', '#06b6d4', '#a855f7']
 
@@ -19,13 +23,37 @@ export default function Dashboard() {
   const errorDist = getErrorDistribution()
   const recentPayments = mockPayments.slice(0, 10)
   const navigate = useNavigate()
+  const { accounts } = useAccounts()
+  const { events: liveEvents } = useLiveEvents()
+
+  // Merge real account data into stats
+  const realBalance = accounts.reduce((s, a) => s + (a.balance?.available?.cents || 0), 0)
+  const realAccountCount = accounts.filter(a => a.status === 'active').length
+
+  // Convert Supabase events to WebhookEvent format for LiveEventFeed
+  const realWebhookEvents: WebhookEvent[] = liveEvents.map(e => ({
+    id: e.id as string,
+    event_type: e.event_type as string,
+    payload: (e.payload as Record<string, unknown>) || {},
+    payment_id: e.payment_id as string | undefined,
+    amount_cents: e.amount_cents as number | undefined,
+    status: e.status as string | undefined,
+    error_code: e.error_code as string | undefined,
+    source_iban: e.source_iban as string | undefined,
+    destination_iban: e.destination_iban as string | undefined,
+    received_at: e.received_at as string,
+    processed: e.processed as boolean,
+  }))
+
+  // Use real events if available, otherwise mock
+  const feedEvents = realWebhookEvents.length > 0 ? realWebhookEvents : mockWebhookEvents
 
   return (
     <div className="space-y-6">
       {/* Metric cards */}
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        <MetricCard label="Total Accounts" value={stats.totalAccounts} icon={<Wallet className="h-5 w-5" />} trend={0} trendLabel="active" />
-        <MetricCard label="Payments Today" value={stats.paymentsToday} icon={<ArrowUpDown className="h-5 w-5" />} trend={12} trendLabel="vs yesterday" />
+        <MetricCard label="Total Accounts" value={isConfigured() && realAccountCount > 0 ? realAccountCount : stats.totalAccounts} icon={<Wallet className="h-5 w-5" />} trend={0} trendLabel={isConfigured() && realBalance > 0 ? formatAmount(realBalance) : 'active'} />
+        <MetricCard label="Payments Today" value={isConfigured() ? liveEvents.filter(e => (e.event_type as string)?.includes('confirmed')).length : stats.paymentsToday} icon={<ArrowUpDown className="h-5 w-5" />} trend={12} trendLabel="vs yesterday" />
         <MetricCard label="Success Rate" value={`${stats.successRate}%`} icon={<CheckCircle className="h-5 w-5" />} trend={2.1} trendLabel="vs last week" />
         <MetricCard label="Avg Delivery" value={`${stats.avgDeliveryTime}s`} icon={<Clock className="h-5 w-5" />} trend={-5} trendLabel="faster" />
         <MetricCard label="Active Webhooks" value={stats.activeWebhooks} icon={<Webhook className="h-5 w-5" />} />
@@ -92,7 +120,7 @@ export default function Dashboard() {
         <div className="lg:col-span-2">
           <Card className="bg-card border-border h-full">
             <CardContent className="p-4">
-              <LiveEventFeed events={mockWebhookEvents} />
+              <LiveEventFeed events={feedEvents} />
             </CardContent>
           </Card>
         </div>

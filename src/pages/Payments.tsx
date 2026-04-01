@@ -16,14 +16,20 @@ import { PaymentTimeline } from '@/components/shared/PaymentTimeline'
 import { mockPayments, mockAccounts, mockRetryLog, mockRetryRules } from '@/lib/mock-data'
 import { truncateId, maskIBAN, formatDateShort, formatDuration } from '@/lib/format'
 import { getErrorInfo } from '@/lib/errors'
-import { Plus, Search, Download } from 'lucide-react'
+import { Plus, Search, Download, Loader2 } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import type { Payment } from '@/lib/types'
+import { useAccounts, useSendPayment } from '@/hooks/useDevengo'
+import { isConfigured } from '@/lib/devengo'
+import { toast } from 'sonner'
 
 export default function Payments() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null)
+  const { accounts: realAccounts } = useAccounts()
+  const { send, sending, result: sendResult } = useSendPayment()
+  const [newPayment, setNewPayment] = useState({ account_id: '', iban: '', recipient: '', description: '', amount: '' })
 
   const filtered = mockPayments.filter(p => {
     if (statusFilter !== 'all' && p.status !== statusFilter) return false
@@ -70,12 +76,12 @@ export default function Payments() {
               <div className="space-y-4 pt-4">
                 <div className="space-y-2">
                   <label className="text-sm text-muted-foreground">Source Account</label>
-                  <Select defaultValue={mockAccounts[0].id}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                  <Select value={newPayment.account_id} onValueChange={(v) => v && setNewPayment(p => ({ ...p, account_id: v }))}>
+                    <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
                     <SelectContent>
-                      {mockAccounts.filter(a => a.status === 'active').map(a => (
+                      {(isConfigured() && realAccounts.length > 0 ? realAccounts : mockAccounts).filter((a: { status: string }) => a.status === 'active').map((a: { id: string; iban?: string; identifiers?: { iban: string }[] }) => (
                         <SelectItem key={a.id} value={a.id}>
-                          <span className="font-mono text-xs">{maskIBAN(a.iban)}</span>
+                          <span className="font-mono text-xs">{maskIBAN(a.iban || a.identifiers?.[0]?.iban || a.id)}</span>
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -83,21 +89,44 @@ export default function Payments() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm text-muted-foreground">Destination IBAN</label>
-                  <Input placeholder="ES00 0000 0000 0000 0000 0000" className="font-mono" />
+                  <Input placeholder="ES6369409999010000000002" className="font-mono" value={newPayment.iban} onChange={(e) => setNewPayment(p => ({ ...p, iban: e.target.value }))} />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm text-muted-foreground">Recipient Name</label>
+                  <Input placeholder="Acme Corp SL" value={newPayment.recipient} onChange={(e) => setNewPayment(p => ({ ...p, recipient: e.target.value }))} />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm text-muted-foreground">Amount (EUR)</label>
-                    <Input type="number" placeholder="0.00" step="0.01" className="font-mono" />
+                    <Input type="number" placeholder="0.00" step="0.01" className="font-mono" value={newPayment.amount} onChange={(e) => setNewPayment(p => ({ ...p, amount: e.target.value }))} />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm text-muted-foreground">Concept</label>
-                    <Input placeholder="Invoice payment" />
+                    <label className="text-sm text-muted-foreground">Description</label>
+                    <Input placeholder="Invoice payment" value={newPayment.description} onChange={(e) => setNewPayment(p => ({ ...p, description: e.target.value }))} />
                   </div>
                 </div>
+                {sendResult && (
+                  <div className={`p-3 rounded-lg text-sm ${sendResult.success ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
+                    {sendResult.success ? `Payment created: ${sendResult.payment?.id}` : `Error: ${sendResult.error}`}
+                  </div>
+                )}
                 <div className="flex gap-2 pt-2">
-                  <Button variant="outline" className="flex-1">Preview</Button>
-                  <Button className="flex-1">Send Payment</Button>
+                  <Button
+                    className="flex-1"
+                    disabled={sending || !newPayment.account_id || !newPayment.iban || !newPayment.amount}
+                    onClick={async () => {
+                      await send({
+                        account_id: newPayment.account_id,
+                        destination_iban: newPayment.iban.replace(/\s/g, ''),
+                        recipient: newPayment.recipient || 'Recipient',
+                        description: newPayment.description || 'Payment',
+                        amount_cents: Math.round(parseFloat(newPayment.amount) * 100),
+                      })
+                      toast.success('Payment sent!')
+                    }}
+                  >
+                    {sending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Sending...</> : 'Send Payment'}
+                  </Button>
                 </div>
               </div>
             </DialogContent>
