@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { MetricCard } from '@/components/shared/MetricCard'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { AmountDisplay } from '@/components/shared/AmountDisplay'
@@ -13,6 +14,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAccounts, useLiveEvents } from '@/hooks/useDevengo'
 import { useBlogDrafts, useTestimonials, useCompetitiveIntel, useSalesLeads } from '@/hooks/useSupabase'
 import { useDataMode } from '@/contexts/DataModeContext'
+import { generateDemoEvent } from '@/lib/demo-ticker'
 import type { WebhookEvent } from '@/lib/types'
 
 const COLORS = ['#ef4444', '#3b82f6', '#eab308', '#22c55e', '#06b6d4', '#a855f7']
@@ -57,7 +59,19 @@ export default function Dashboard() {
     processed: e.processed as boolean,
   }))
 
-  const feedEvents = isLive && realWebhookEvents.length > 0 ? realWebhookEvents : mockWebhookEvents
+  // Demo ticker: simulate new events every 8 seconds
+  const [demoTickerEvents, setDemoTickerEvents] = useState<WebhookEvent[]>([])
+  useEffect(() => {
+    if (isLive) return
+    const interval = setInterval(() => {
+      setDemoTickerEvents(prev => [generateDemoEvent(), ...prev].slice(0, 10))
+    }, 8000)
+    return () => clearInterval(interval)
+  }, [isLive])
+
+  const feedEvents = isLive && realWebhookEvents.length > 0
+    ? realWebhookEvents
+    : [...demoTickerEvents, ...mockWebhookEvents]
 
   return (
     <div className="space-y-6">

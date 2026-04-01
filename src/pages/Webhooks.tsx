@@ -9,34 +9,36 @@ import { StatusBadge } from '@/components/shared/StatusBadge'
 import { mockWebhooks, mockWebhookRequests } from '@/lib/mock-data'
 import { WEBHOOK_URL } from '@/lib/supabase'
 import { formatDateShort } from '@/lib/format'
-import { Plus, Send, ExternalLink, Copy, Check } from 'lucide-react'
+import { Plus, Send, Copy, Check, Webhook } from 'lucide-react'
 import { RadialBarChart, RadialBar, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts'
 import { cn } from '@/lib/utils'
+import { useDataMode } from '@/contexts/DataModeContext'
+import { toast } from 'sonner'
 
 export default function Webhooks() {
+  const { isDemo } = useDataMode()
   const [urlCopied, setUrlCopied] = useState(false)
 
   const totalRequests = mockWebhookRequests.length
   const successRequests = mockWebhookRequests.filter(r => r.http_status === 200).length
   const successRate = Math.round((successRequests / totalRequests) * 100)
-
   const radialData = [{ name: 'Success', value: successRate, fill: '#22c55e' }]
 
-  // Response time distribution
-  const p50 = [...mockWebhookRequests].sort((a, b) => a.response_time_ms - b.response_time_ms)[Math.floor(totalRequests * 0.5)]?.response_time_ms ?? 0
-  const p90 = [...mockWebhookRequests].sort((a, b) => a.response_time_ms - b.response_time_ms)[Math.floor(totalRequests * 0.9)]?.response_time_ms ?? 0
-  const p99 = [...mockWebhookRequests].sort((a, b) => a.response_time_ms - b.response_time_ms)[Math.floor(totalRequests * 0.99)]?.response_time_ms ?? 0
-
-  const latencyData = [
-    { name: 'p50', value: p50 },
-    { name: 'p90', value: p90 },
-    { name: 'p99', value: p99 },
-  ]
+  const sorted = [...mockWebhookRequests].sort((a, b) => a.response_time_ms - b.response_time_ms)
+  const p50 = sorted[Math.floor(totalRequests * 0.5)]?.response_time_ms ?? 0
+  const p90 = sorted[Math.floor(totalRequests * 0.9)]?.response_time_ms ?? 0
+  const p99 = sorted[Math.floor(totalRequests * 0.99)]?.response_time_ms ?? 0
+  const latencyData = [{ name: 'p50', value: p50 }, { name: 'p90', value: p90 }, { name: 'p99', value: p99 }]
 
   const handleCopyUrl = async () => {
     await navigator.clipboard.writeText(WEBHOOK_URL)
     setUrlCopied(true)
+    toast.success('Webhook URL copied to clipboard')
     setTimeout(() => setUrlCopied(false), 2000)
+  }
+
+  const handleTest = () => {
+    toast.info('Test event simulated', { description: 'A mock outgoing_payment.confirmed event was injected into the event log.' })
   }
 
   return (
@@ -45,7 +47,7 @@ export default function Webhooks() {
       <Card className="bg-primary/5 border-primary/20">
         <CardContent className="p-4">
           <div className="flex items-center gap-3">
-            <ExternalLink className="h-5 w-5 text-primary shrink-0" />
+            <Webhook className="h-5 w-5 text-primary shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="text-xs text-muted-foreground">Your Webhook Receiver — register this URL in Devengo's control panel</p>
               <p className="text-sm font-mono truncate">{WEBHOOK_URL}</p>
@@ -64,7 +66,7 @@ export default function Webhooks() {
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm font-medium">Registered Webhooks</CardTitle>
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" className="gap-1.5">
+              <Button size="sm" variant="outline" className="gap-1.5" onClick={handleTest}>
                 <Send className="h-3.5 w-3.5" /> Test
               </Button>
               <Dialog>
@@ -91,7 +93,7 @@ export default function Webhooks() {
                         ))}
                       </div>
                     </div>
-                    <Button className="w-full">Register Webhook</Button>
+                    <Button className="w-full" onClick={() => toast.success('Webhook registered (demo)')}>Register Webhook</Button>
                   </div>
                 </DialogContent>
               </Dialog>
@@ -112,16 +114,14 @@ export default function Webhooks() {
               {mockWebhooks.map(w => (
                 <TableRow key={w.id} className="border-border">
                   <TableCell>
-                    <span className="flex items-center gap-1.5 text-sm font-mono">
+                    <span className="text-sm font-mono text-muted-foreground">
                       {w.url}
-                      <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                      {isDemo && <Badge variant="outline" className="ml-2 text-[9px] text-muted-foreground">demo</Badge>}
                     </span>
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
-                      {w.subscribed_events.map(e => (
-                        <Badge key={e} variant="outline" className="text-[10px] font-mono">{e}</Badge>
-                      ))}
+                      {w.subscribed_events.map(e => (<Badge key={e} variant="outline" className="text-[10px] font-mono">{e}</Badge>))}
                     </div>
                   </TableCell>
                   <TableCell><StatusBadge status={w.status} /></TableCell>
@@ -136,9 +136,7 @@ export default function Webhooks() {
       {/* Delivery health */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="bg-card border-border">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Delivery Success Rate</CardTitle>
-          </CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Delivery Success Rate</CardTitle></CardHeader>
           <CardContent className="flex items-center justify-center">
             <div className="relative">
               <ResponsiveContainer width={200} height={200}>
@@ -155,11 +153,8 @@ export default function Webhooks() {
             </div>
           </CardContent>
         </Card>
-
         <Card className="bg-card border-border">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Response Time (ms)</CardTitle>
-          </CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Response Time (ms)</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={180}>
               <BarChart data={latencyData}>
@@ -174,11 +169,9 @@ export default function Webhooks() {
         </Card>
       </div>
 
-      {/* Event log */}
+      {/* Delivery log */}
       <Card className="bg-card border-border">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium">Delivery Log</CardTitle>
-        </CardHeader>
+        <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Delivery Log</CardTitle></CardHeader>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
@@ -191,26 +184,22 @@ export default function Webhooks() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {mockWebhookRequests.slice(0, 20).map(r => (
-                <TableRow
-                  key={r.id}
-                    className="border-border hover:bg-secondary/50 transition-colors"
-                  >
-                    <TableCell className="font-mono text-xs text-muted-foreground">{formatDateShort(r.created_at)}</TableCell>
-                    <TableCell><Badge variant="outline" className="text-[10px] font-mono">{r.event_type}</Badge></TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={cn(
-                        'font-mono text-xs',
-                        r.http_status === 200 ? 'bg-success/10 text-success border-success/30' :
-                        r.http_status >= 500 ? 'bg-destructive/10 text-destructive border-destructive/30' :
-                        'bg-warning/10 text-warning border-warning/30'
-                      )}>
-                        {r.http_status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">{r.response_time_ms}ms</TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">{r.payload_size_bytes}B</TableCell>
-                  </TableRow>
+              {mockWebhookRequests.length === 0 ? (
+                <TableRow><TableCell colSpan={5} className="text-center py-12 text-muted-foreground">No webhook events yet — events appear when payments are processed</TableCell></TableRow>
+              ) : mockWebhookRequests.slice(0, 20).map(r => (
+                <TableRow key={r.id} className="border-border hover:bg-secondary/50 transition-colors">
+                  <TableCell className="font-mono text-xs text-muted-foreground">{formatDateShort(r.created_at)}</TableCell>
+                  <TableCell><Badge variant="outline" className="text-[10px] font-mono">{r.event_type}</Badge></TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className={cn('font-mono text-xs',
+                      r.http_status === 200 ? 'bg-success/10 text-success border-success/30' :
+                      r.http_status >= 500 ? 'bg-destructive/10 text-destructive border-destructive/30' :
+                      'bg-warning/10 text-warning border-warning/30'
+                    )}>{r.http_status}</Badge>
+                  </TableCell>
+                  <TableCell className="font-mono text-xs">{r.response_time_ms}ms</TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground">{r.payload_size_bytes}B</TableCell>
+                </TableRow>
               ))}
             </TableBody>
           </Table>

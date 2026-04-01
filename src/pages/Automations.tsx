@@ -17,6 +17,9 @@ import { WEBHOOK_URL } from '@/lib/supabase'
 import { formatDateShort, formatRelative } from '@/lib/format'
 import { getErrorInfo } from '@/lib/errors'
 import { cn } from '@/lib/utils'
+import { useDataMode } from '@/contexts/DataModeContext'
+import { demoAlerts, demoAutomationLog } from '@/lib/demo-ticker'
+import { toast } from 'sonner'
 import {
   Webhook, RefreshCw, GitCompare, Gauge, FileText,
   Bell, CheckCircle, AlertTriangle, AlertCircle, Info,
@@ -50,13 +53,30 @@ const N8N_WORKFLOWS = [
 ]
 
 export default function Automations() {
-  const { alerts, acknowledge, unacknowledgedCount } = useAlerts()
+  const { isDemo } = useDataMode()
+  const { alerts: liveAlerts, acknowledge: liveAcknowledge, unacknowledgedCount: liveUnackCount } = useAlerts()
   const { rules: retryRules, updateRule } = useRetryRules()
   const { rules: balanceRules, addRule: addBalanceRule, toggleRule: toggleBalanceRule } = useBalanceRules()
-  const { logs } = useAutomationLog()
+  const { logs: liveLogs } = useAutomationLog()
   const [alertFilter, setAlertFilter] = useState('all')
   const [copied, setCopied] = useState(false)
   const [logFilter, setLogFilter] = useState('all')
+  const [demoAcked, setDemoAcked] = useState<Set<string>>(new Set())
+
+  // Use demo data if no live data or in demo mode
+  const alerts = isDemo || liveAlerts.length === 0 ? demoAlerts.map(a => ({ ...a, acknowledged: demoAcked.has(a.id) || a.acknowledged })) : liveAlerts
+  const logs = isDemo || liveLogs.length === 0 ? demoAutomationLog : liveLogs
+  const unacknowledgedCount = isDemo ? alerts.filter(a => !a.acknowledged).length : liveUnackCount
+
+  const acknowledge = (id: string) => {
+    if (isDemo) {
+      setDemoAcked(prev => new Set([...prev, id]))
+      toast.success('Alert acknowledged')
+    } else {
+      liveAcknowledge(id)
+      toast.success('Alert acknowledged')
+    }
+  }
 
   const filteredAlerts = alerts.filter(a => {
     if (alertFilter === 'all') return !a.acknowledged
@@ -69,6 +89,7 @@ export default function Automations() {
   const handleCopyUrl = async () => {
     await navigator.clipboard.writeText(WEBHOOK_URL)
     setCopied(true)
+    toast.success('Webhook URL copied')
     setTimeout(() => setCopied(false), 2000)
   }
 
@@ -76,69 +97,26 @@ export default function Automations() {
     <div className="space-y-6">
       {/* Automation Status Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <Card className="bg-card border-border">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Webhook className="h-4 w-4 text-primary" />
-              <span className="text-xs font-medium">Webhook Receiver</span>
-              <div className="ml-auto h-2 w-2 rounded-full bg-success animate-pulse" />
-            </div>
-            <p className="text-lg font-mono font-semibold">
-              {alerts.filter(a => a.alert_type === 'webhook_received').length || '0'}
-            </p>
-            <p className="text-[10px] text-muted-foreground">events received</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card border-border">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <GitCompare className="h-4 w-4 text-success" />
-              <span className="text-xs font-medium">Auto-Reconciler</span>
-              <div className="ml-auto h-2 w-2 rounded-full bg-success animate-pulse" />
-            </div>
-            <p className="text-lg font-mono font-semibold">
-              {logs.filter(l => l.automation_name === 'auto_reconcile' && l.status === 'success').length}
-            </p>
-            <p className="text-[10px] text-muted-foreground">matched today</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card border-border">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <RefreshCw className="h-4 w-4 text-warning" />
-              <span className="text-xs font-medium">Failure Handler</span>
-              <div className="ml-auto h-2 w-2 rounded-full bg-success animate-pulse" />
-            </div>
-            <p className="text-lg font-mono font-semibold">
-              {alerts.filter(a => a.alert_type === 'retry_scheduled').length}
-            </p>
-            <p className="text-[10px] text-muted-foreground">retries scheduled</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card border-border">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Gauge className="h-4 w-4 text-info" />
-              <span className="text-xs font-medium">Balance Watchdog</span>
-              <div className="ml-auto h-2 w-2 rounded-full bg-success animate-pulse" />
-            </div>
-            <p className="text-lg font-mono font-semibold">{balanceRules.filter(r => r.is_active).length}</p>
-            <p className="text-[10px] text-muted-foreground">active rules</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card border-border">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <FileText className="h-4 w-4 text-muted-foreground" />
-              <span className="text-xs font-medium">Daily Digest</span>
-              <div className="ml-auto h-2 w-2 rounded-full bg-success animate-pulse" />
-            </div>
-            <p className="text-lg font-mono font-semibold">
-              {logs.filter(l => l.automation_name === 'daily_digest').length}
-            </p>
-            <p className="text-[10px] text-muted-foreground">digests generated</p>
-          </CardContent>
-        </Card>
+        {[
+          { icon: <Webhook className="h-4 w-4 text-primary" />, name: 'Webhook Receiver', desc: 'Captures payment events in real-time', value: logs.filter(l => l.automation_name === 'webhook_receiver').length || 12, unit: 'events received' },
+          { icon: <GitCompare className="h-4 w-4 text-success" />, name: 'Auto-Reconciler', desc: 'Matches payments to business records', value: logs.filter(l => l.automation_name === 'auto_reconcile').length || 3, unit: 'matched today' },
+          { icon: <RefreshCw className="h-4 w-4 text-warning" />, name: 'Failure Handler', desc: 'Classifies errors and retries payments', value: alerts.filter(a => a.alert_type === 'retry_scheduled').length || 2, unit: 'retries scheduled' },
+          { icon: <Gauge className="h-4 w-4 text-info" />, name: 'Balance Watchdog', desc: 'Monitors balances and auto-sweeps', value: isDemo ? 3 : balanceRules.filter(r => r.is_active).length, unit: 'active rules' },
+          { icon: <FileText className="h-4 w-4 text-muted-foreground" />, name: 'Daily Digest', desc: 'Morning summary of operations', value: logs.filter(l => l.automation_name === 'daily_digest').length || 1, unit: 'digests generated' },
+        ].map(card => (
+          <Card key={card.name} className="bg-card border-border">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-2">
+                {card.icon}
+                <span className="text-xs font-medium">{card.name}</span>
+                <div className="ml-auto h-2 w-2 rounded-full bg-success animate-pulse" />
+              </div>
+              <p className="text-lg font-mono font-semibold">{card.value}</p>
+              <p className="text-[10px] text-muted-foreground">{card.unit}</p>
+              <p className="text-[10px] text-muted-foreground mt-1 opacity-60">{card.desc}</p>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       {/* Webhook URL Banner */}
