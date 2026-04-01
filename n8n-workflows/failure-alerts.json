@@ -1,0 +1,123 @@
+{
+  "name": "Devengo — Payment Failure Alerting",
+  "nodes": [
+    {
+      "parameters": { "httpMethod": "POST", "path": "devengo-failure-alert", "options": {} },
+      "id": "webhook",
+      "name": "Webhook from Edge Function",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "conditions": { "conditions": [{ "id": "is-failed", "leftValue": "={{ $json.event_type }}", "rightValue": "payment.failed", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }
+      },
+      "id": "is-failure",
+      "name": "Is Payment Failed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const errorCode = $json.error_code || 'UNKNOWN';\nconst terminalCodes = ['AC04', 'AC01', 'MD07', 'AG01', 'AM05', 'FOCR', 'DNOR', 'CNOR'];\nconst retryableCodes = ['AC06', 'AB10', 'MS03'];\n\nconst labels = {\n  'AC01': 'Incorrect IBAN', 'AC04': 'Closed Account', 'AC06': 'Blocked Account',\n  'AG01': 'Transaction Forbidden', 'AM05': 'Duplicate', 'AB10': 'CSM Error',\n  'MS03': 'Not Specified', 'FOCR': 'Cancellation', 'MD07': 'Deceased',\n  'DNOR': 'Debtor Not Found', 'CNOR': 'Creditor Not Found'\n};\n\nconst severity = terminalCodes.includes(errorCode) ? 'critical' : retryableCodes.includes(errorCode) ? 'warning' : 'info';\nconst label = labels[errorCode] || 'Unknown Error';\nconst retryable = retryableCodes.includes(errorCode);\n\nreturn [{ json: { ...$json, severity, label, retryable, errorCode } }];"
+      },
+      "id": "classify",
+      "name": "Classify Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 200]
+    },
+    {
+      "parameters": {
+        "rules": { "rules": [
+          { "outputIndex": 0, "value": "critical" },
+          { "outputIndex": 1, "value": "warning" }
+        ] },
+        "dataType": "string",
+        "value": "={{ $json.severity }}"
+      },
+      "id": "severity-switch",
+      "name": "Severity Router",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [880, 200]
+    },
+    {
+      "parameters": {
+        "fromEmail": "alerts@devengo-demo.com",
+        "toEmail": "ops@devengo.com",
+        "subject": "=URGENT: Payment {{ $json.payment_id }} failed — {{ $json.label }}",
+        "html": "=<div style=\"font-family:system-ui;background:#18181b;color:#fafafa;padding:24px;border-radius:8px\"><h2 style=\"color:#ef4444;margin:0 0 12px\">Critical Payment Failure</h2><p><strong>Payment:</strong> {{ $json.payment_id }}</p><p><strong>Error:</strong> {{ $json.errorCode }} — {{ $json.label }}</p><p><strong>Amount:</strong> €{{ ($json.amount_cents / 100).toFixed(2) }}</p><p style=\"color:#ef4444;margin-top:12px\">This error is <strong>not retryable</strong>. Manual review required.</p></div>",
+        "options": {}
+      },
+      "id": "critical-email",
+      "name": "Send Critical Alert Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1100, 100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://svujoznxajtzlhzslenf.supabase.co/rest/v1/devengo_alerts",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "apikey", "value": "={{ $credentials.supabaseApiKey }}" }, { "name": "Content-Type", "value": "application/json" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"alert_type\": \"payment_failure\",\n  \"severity\": \"{{ $json.severity }}\",\n  \"title\": \"Payment {{ $json.payment_id }} failed: {{ $json.label }}\",\n  \"description\": \"Error {{ $json.errorCode }}. {{ $json.retryable ? 'Retryable — will attempt retry.' : 'Terminal — manual review required.' }}\",\n  \"payment_id\": \"{{ $json.payment_id }}\",\n  \"error_code\": \"{{ $json.errorCode }}\"\n}",
+        "options": {}
+      },
+      "id": "store-alert",
+      "name": "Store Alert in Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, 300]
+    },
+    {
+      "parameters": {
+        "conditions": { "conditions": [{ "id": "is-incoming", "leftValue": "={{ $json.event_type }}", "rightValue": "incoming_payment.confirmed", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" }
+      },
+      "id": "is-incoming",
+      "name": "Is Large Incoming?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [440, 500]
+    },
+    {
+      "parameters": {
+        "conditions": { "conditions": [{ "id": "large-amount", "leftValue": "={{ $json.amount_cents }}", "rightValue": 1000000, "operator": { "type": "number", "operation": "gte" } }], "combinator": "and" }
+      },
+      "id": "check-large",
+      "name": "Amount > €10,000?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [660, 500]
+    },
+    {
+      "parameters": {
+        "fromEmail": "alerts@devengo-demo.com",
+        "toEmail": "finance@devengo.com",
+        "subject": "=Large incoming payment: €{{ ($json.amount_cents / 100).toFixed(2) }}",
+        "html": "=<div style=\"font-family:system-ui;background:#18181b;color:#fafafa;padding:24px;border-radius:8px\"><h2 style=\"color:#22c55e;margin:0 0 12px\">Large Incoming Payment</h2><p><strong>Amount:</strong> €{{ ($json.amount_cents / 100).toFixed(2) }}</p><p><strong>From:</strong> {{ $json.source_iban || 'Unknown' }}</p><p><strong>Payment ID:</strong> {{ $json.payment_id }}</p></div>",
+        "options": {}
+      },
+      "id": "large-payment-email",
+      "name": "Notify Large Payment",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [880, 500]
+    }
+  ],
+  "connections": {
+    "Webhook from Edge Function": { "main": [[ { "node": "Is Payment Failed?", "type": "main", "index": 0 }, { "node": "Is Large Incoming?", "type": "main", "index": 0 } ]] },
+    "Is Payment Failed?": { "main": [[ { "node": "Classify Error", "type": "main", "index": 0 } ], []] },
+    "Classify Error": { "main": [[ { "node": "Severity Router", "type": "main", "index": 0 } ]] },
+    "Severity Router": { "main": [[ { "node": "Send Critical Alert Email", "type": "main", "index": 0 }, { "node": "Store Alert in Supabase", "type": "main", "index": 0 } ], [ { "node": "Store Alert in Supabase", "type": "main", "index": 0 } ]] },
+    "Is Large Incoming?": { "main": [[ { "node": "Amount > €10,000?", "type": "main", "index": 0 } ], []] },
+    "Amount > €10,000?": { "main": [[ { "node": "Notify Large Payment", "type": "main", "index": 0 } ], []] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "devengo" }, { "name": "alerting" }]
+}

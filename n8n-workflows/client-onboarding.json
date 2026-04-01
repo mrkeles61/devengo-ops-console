@@ -1,0 +1,251 @@
+{
+  "name": "Devengo — Client Onboarding Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "devengo-onboarding",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "New Client Form",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.sandbox.devengo.com/v1/account_holders",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Authorization", "value": "={{ $credentials.devengoHmacAuth }}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "name", "value": "={{ $json.company_name }}" },
+            { "name": "tax_id", "value": "={{ $json.tax_id }}" },
+            { "name": "address", "value": "={{ $json.address }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "create-holder",
+      "name": "Create Account Holder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 300],
+      "notesInFlow": true,
+      "notes": "POST /v1/account_holders — Creates the legal entity in Devengo. Triggers KYB verification."
+    },
+    {
+      "parameters": {
+        "amount": 30,
+        "unit": "seconds"
+      },
+      "id": "wait-kyb",
+      "name": "Wait for KYB",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.sandbox.devengo.com/v1/account_holders/{{ $('Create Account Holder').item.json.id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "={{ $credentials.devengoHmacAuth }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "check-kyb",
+      "name": "Check KYB Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "" },
+          "conditions": [
+            {
+              "id": "kyb-check",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "validated",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-validated",
+      "name": "KYB Validated?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1100, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.sandbox.devengo.com/v1/accounts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Authorization", "value": "={{ $credentials.devengoHmacAuth }}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "account_holder_id", "value": "={{ $('Create Account Holder').item.json.id }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "create-account",
+      "name": "Create IBAN Account",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1320, 200],
+      "notesInFlow": true,
+      "notes": "POST /v1/accounts — Creates a new EUR IBAN for the validated entity."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.sandbox.devengo.com/v1/payments",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Authorization", "value": "={{ $credentials.devengoHmacAuth }}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "source_account_id", "value": "={{ $json.id }}" },
+            { "name": "destination_iban", "value": "={{ $('New Client Form').item.json.test_iban || 'ES9121000418450200051332' }}" },
+            { "name": "amount_cents", "value": "1" },
+            { "name": "concept", "value": "Devengo onboarding test payment" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "test-payment",
+      "name": "Send €0.01 Test Payment",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1540, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://svujoznxajtzlhzslenf.supabase.co/rest/v1/devengo_automation_log",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $credentials.supabaseApiKey }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=representation" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"automation_name\": \"client_onboarding\",\n  \"status\": \"success\",\n  \"input_data\": { \"company\": \"{{ $('New Client Form').item.json.company_name }}\" },\n  \"output_data\": { \"account_id\": \"{{ $('Create IBAN Account').item.json.id }}\", \"payment_id\": \"{{ $json.id }}\" }\n}",
+        "options": {}
+      },
+      "id": "log-success",
+      "name": "Log Success to Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1760, 200]
+    },
+    {
+      "parameters": {
+        "fromEmail": "ops@devengo-demo.com",
+        "toEmail": "={{ $('New Client Form').item.json.contact_email }}",
+        "subject": "Your Devengo account is ready!",
+        "html": "=<h2>Welcome to Devengo</h2><p>Your account has been created and verified.</p><p><strong>IBAN:</strong> {{ $('Create IBAN Account').item.json.iban }}</p><p>A test payment of €0.01 has been sent to verify connectivity.</p><p>You can start sending payments immediately via our API.</p>",
+        "options": {}
+      },
+      "id": "welcome-email",
+      "name": "Send Welcome Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1980, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://svujoznxajtzlhzslenf.supabase.co/rest/v1/devengo_automation_log",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $credentials.supabaseApiKey }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"automation_name\": \"client_onboarding\",\n  \"status\": \"error\",\n  \"error_message\": \"KYB validation failed for {{ $('New Client Form').item.json.company_name }}\"\n}",
+        "options": {}
+      },
+      "id": "log-kyb-failure",
+      "name": "Log KYB Failure",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1320, 440]
+    },
+    {
+      "parameters": {
+        "fromEmail": "ops@devengo-demo.com",
+        "toEmail": "sales@devengo.com",
+        "subject": "=KYB verification needs attention — {{ $('New Client Form').item.json.company_name }}",
+        "html": "=<h2>KYB Verification Failed</h2><p>Company: <strong>{{ $('New Client Form').item.json.company_name }}</strong></p><p>Tax ID: {{ $('New Client Form').item.json.tax_id }}</p><p>Status: {{ $('Check KYB Status').item.json.status }}</p><p>Please review manually in the Devengo control panel.</p>",
+        "options": {}
+      },
+      "id": "kyb-alert-email",
+      "name": "Alert Sales Team",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1540, 440]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"status\": \"processing\", \"holder_id\": \"{{ $('Create Account Holder').item.json.id }}\" }",
+        "options": {}
+      },
+      "id": "respond-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [440, 480]
+    }
+  ],
+  "connections": {
+    "New Client Form": { "main": [[ { "node": "Create Account Holder", "type": "main", "index": 0 }, { "node": "Respond to Webhook", "type": "main", "index": 0 } ]] },
+    "Create Account Holder": { "main": [[ { "node": "Wait for KYB", "type": "main", "index": 0 } ]] },
+    "Wait for KYB": { "main": [[ { "node": "Check KYB Status", "type": "main", "index": 0 } ]] },
+    "Check KYB Status": { "main": [[ { "node": "KYB Validated?", "type": "main", "index": 0 } ]] },
+    "KYB Validated?": { "main": [[ { "node": "Create IBAN Account", "type": "main", "index": 0 } ], [ { "node": "Log KYB Failure", "type": "main", "index": 0 } ]] },
+    "Create IBAN Account": { "main": [[ { "node": "Send €0.01 Test Payment", "type": "main", "index": 0 } ]] },
+    "Send €0.01 Test Payment": { "main": [[ { "node": "Log Success to Supabase", "type": "main", "index": 0 } ]] },
+    "Log Success to Supabase": { "main": [[ { "node": "Send Welcome Email", "type": "main", "index": 0 } ]] },
+    "Log KYB Failure": { "main": [[ { "node": "Alert Sales Team", "type": "main", "index": 0 } ]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": [{ "name": "devengo" }, { "name": "onboarding" }],
+  "pinData": {}
+}

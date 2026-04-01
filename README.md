@@ -1,73 +1,54 @@
-# React + TypeScript + Vite
+# Devengo Ops Console
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A programmable payment operations platform built on [Devengo](https://devengo.com)'s instant A2A payments API.
 
-Currently, two official plugins are available:
+## What It Does
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Payment Dashboard** — Real-time payment monitoring with success rates, error analytics, and live event feed
+- **Smart Retry Monitor** — Configurable retry rules with error classification and recovery tracking
+- **Reconciliation Engine** — Auto-match incoming payments to expected business records
+- **Webhook Health** — Monitor webhook delivery rates, response times, and payload inspection
+- **Balance Watchdog** — Automated balance monitoring with configurable sweep rules
+- **Automations** — 3 Supabase Edge Functions + 7 n8n workflows for end-to-end payment automation
 
-## React Compiler
+## Tech Stack
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+React 19 + TypeScript + Vite 8 + Tailwind CSS v4 + shadcn/ui + Recharts + Supabase + Devengo Sandbox API
 
-## Expanding the ESLint configuration
+## Quick Start
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+git clone <repo-url>
+cd devengo-ops-console
+npm install
+cp .env.example .env  # fill in your keys
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Open http://localhost:5173
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Supabase Edge Functions
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+| Function | Trigger | Purpose |
+|----------|---------|---------|
+| `devengo-webhook-receiver` | POST webhook (no JWT) | Receives Devengo events, auto-reconciles, handles failures |
+| `balance-watchdog` | Manual / pg_cron | Checks balance rules, triggers sweeps and alerts |
+| `daily-digest` | Manual / pg_cron | Generates daily payment summary report |
+
+## n8n Workflows
+
+Import the JSON files from `/n8n-workflows` into your n8n instance:
+
+| Workflow | Trigger | What It Does |
+|----------|---------|-------------|
+| Client Onboarding | Webhook | Account holder + KYB + IBAN + test payment in 60s |
+| Daily Sales Report | Cron 08:00 | Branded HTML report to CEO every morning |
+| Failure Alerts | Webhook | Classifies errors, routes critical to email |
+| Invoice Reconciliation | Webhook | Auto-matches payments to business records |
+| Bulk Payment Processor | Webhook | Rate-limited batch processing with reporting |
+| Competitive Monitor | Cron Mon 09:00 | Weekly briefing with internal vs competitor stats |
+| Balance Sweep | Cron 30min | Auto-sweeps excess funds, alerts on low balances |
+
+## Built By
+
+Eren Keles — AI Automation Specialist

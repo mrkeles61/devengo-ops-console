@@ -1,0 +1,116 @@
+{
+  "name": "Devengo — Daily Sales Report",
+  "nodes": [
+    {
+      "parameters": { "rule": { "interval": [{ "triggerAtHour": 8 }] } },
+      "id": "cron-trigger",
+      "name": "Every Day 08:00 CET",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://api.sandbox.devengo.com/v1/accounts",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "={{ $credentials.devengoHmacAuth }}" }] },
+        "options": {}
+      },
+      "id": "get-accounts",
+      "name": "Get All Accounts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 200]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.sandbox.devengo.com/v1/payments?created_after={{ $now.minus(1, 'day').toISO() }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "={{ $credentials.devengoHmacAuth }}" }] },
+        "options": {}
+      },
+      "id": "get-payments",
+      "name": "Get Yesterday's Payments",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 400]
+    },
+    {
+      "parameters": {
+        "url": "https://svujoznxajtzlhzslenf.supabase.co/rest/v1/devengo_reconciliation?select=status&matched_at=gte.{{ $now.minus(1, 'day').startOf('day').toISO() }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "apikey", "value": "={{ $credentials.supabaseApiKey }}" }] },
+        "options": {}
+      },
+      "id": "get-recon",
+      "name": "Get Reconciliation Stats",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 600]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const payments = $('Get Yesterday\\'s Payments').all().map(i => i.json);\nconst accounts = $('Get All Accounts').all().map(i => i.json);\nconst recon = $('Get Reconciliation Stats').all().map(i => i.json);\n\nconst allPayments = Array.isArray(payments[0]) ? payments[0] : payments;\nconst total = allPayments.length;\nconst confirmed = allPayments.filter(p => p.status === 'confirmed').length;\nconst failed = allPayments.filter(p => p.status === 'failed' || p.status === 'rejected').length;\nconst totalVolume = allPayments.filter(p => p.status === 'confirmed').reduce((s, p) => s + (p.amount_cents || 0), 0);\nconst successRate = total > 0 ? ((confirmed / total) * 100).toFixed(1) : '0';\n\nconst errorCounts = {};\nallPayments.filter(p => p.error_code).forEach(p => {\n  errorCounts[p.error_code] = (errorCounts[p.error_code] || 0) + 1;\n});\n\nconst allAccounts = Array.isArray(accounts[0]) ? accounts[0] : accounts;\nconst totalBalance = allAccounts.reduce((s, a) => s + (a.balance_cents || 0), 0);\n\nconst matched = recon.filter(r => r.status === 'matched').length;\nconst orphaned = recon.filter(r => r.status === 'orphaned').length;\n\nreturn [{\n  json: {\n    date: $now.minus(1, 'day').toFormat('dd MMM yyyy'),\n    total, confirmed, failed, successRate,\n    totalVolume: (totalVolume / 100).toFixed(2),\n    activeAccounts: allAccounts.length,\n    totalBalance: (totalBalance / 100).toFixed(2),\n    errorCounts,\n    matched, orphaned,\n    failedPayments: allPayments.filter(p => p.error_code).slice(0, 10)\n  }\n}];"
+      },
+      "id": "calculate-stats",
+      "name": "Calculate Stats",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const d = $input.all()[0].json;\n\nconst errorRows = d.failedPayments.map(p =>\n  `<tr><td style=\"padding:6px 12px;font-family:monospace;font-size:12px\">${(p.id || '').slice(0,12)}</td><td style=\"padding:6px 12px\">€${((p.amount_cents||0)/100).toFixed(2)}</td><td style=\"padding:6px 12px;font-family:monospace\">${p.error_code||'—'}</td><td style=\"padding:6px 12px\">${p.status}</td></tr>`\n).join('');\n\nconst html = `\n<div style=\"font-family:system-ui,sans-serif;max-width:640px;margin:0 auto;background:#09090b;color:#fafafa;padding:32px;border-radius:12px\">\n  <div style=\"text-align:center;margin-bottom:24px\">\n    <h1 style=\"font-size:20px;margin:0;color:#3b82f6\">Devengo Daily Report</h1>\n    <p style=\"color:#71717a;font-size:13px;margin:4px 0 0\">${d.date}</p>\n  </div>\n  <div style=\"display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px\">\n    <div style=\"background:#18181b;padding:16px;border-radius:8px;text-align:center\">\n      <div style=\"font-size:28px;font-weight:700;font-family:monospace\">${d.total}</div>\n      <div style=\"font-size:11px;color:#71717a\">Payments</div>\n    </div>\n    <div style=\"background:#18181b;padding:16px;border-radius:8px;text-align:center\">\n      <div style=\"font-size:28px;font-weight:700;font-family:monospace;color:#22c55e\">${d.successRate}%</div>\n      <div style=\"font-size:11px;color:#71717a\">Success Rate</div>\n    </div>\n    <div style=\"background:#18181b;padding:16px;border-radius:8px;text-align:center\">\n      <div style=\"font-size:28px;font-weight:700;font-family:monospace\">€${d.totalVolume}</div>\n      <div style=\"font-size:11px;color:#71717a\">Volume</div>\n    </div>\n    <div style=\"background:#18181b;padding:16px;border-radius:8px;text-align:center\">\n      <div style=\"font-size:28px;font-weight:700;font-family:monospace\">${d.activeAccounts}</div>\n      <div style=\"font-size:11px;color:#71717a\">Accounts</div>\n    </div>\n  </div>\n  ${d.failed > 0 ? `<div style=\"margin-bottom:24px\">\n    <h3 style=\"font-size:14px;margin:0 0 8px;color:#ef4444\">Failed Payments (${d.failed})</h3>\n    <table style=\"width:100%;border-collapse:collapse;background:#18181b;border-radius:8px;overflow:hidden\">\n      <thead><tr style=\"background:#27272a\"><th style=\"padding:8px 12px;text-align:left;font-size:11px;color:#71717a\">ID</th><th style=\"padding:8px 12px;text-align:left;font-size:11px;color:#71717a\">Amount</th><th style=\"padding:8px 12px;text-align:left;font-size:11px;color:#71717a\">Error</th><th style=\"padding:8px 12px;text-align:left;font-size:11px;color:#71717a\">Status</th></tr></thead>\n      <tbody>${errorRows}</tbody>\n    </table>\n  </div>` : ''}\n  <div style=\"margin-bottom:24px\">\n    <h3 style=\"font-size:14px;margin:0 0 8px\">Reconciliation</h3>\n    <p style=\"color:#a1a1aa;font-size:13px\">Matched: <strong style=\"color:#22c55e\">${d.matched}</strong> · Orphaned: <strong style=\"color:#eab308\">${d.orphaned}</strong></p>\n  </div>\n  <div style=\"margin-bottom:24px\">\n    <h3 style=\"font-size:14px;margin:0 0 8px\">Total Balance</h3>\n    <p style=\"font-size:24px;font-weight:700;font-family:monospace;margin:0\">€${d.totalBalance}</p>\n  </div>\n  <div style=\"text-align:center;padding-top:16px;border-top:1px solid #27272a\">\n    <p style=\"color:#71717a;font-size:11px;margin:0\">Generated automatically by Devengo Ops Console</p>\n  </div>\n</div>`;\n\nreturn [{ json: { html, ...d } }];"
+      },
+      "id": "generate-html",
+      "name": "Generate HTML Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [940, 300]
+    },
+    {
+      "parameters": {
+        "fromEmail": "ops@devengo-demo.com",
+        "toEmail": "fernando@devengo.com",
+        "subject": "=Devengo Daily Report — {{ $json.date }}",
+        "html": "={{ $json.html }}",
+        "options": {}
+      },
+      "id": "send-report",
+      "name": "Email Daily Report",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1160, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://svujoznxajtzlhzslenf.supabase.co/rest/v1/devengo_daily_digests",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "apikey", "value": "={{ $credentials.supabaseApiKey }}" }, { "name": "Content-Type", "value": "application/json" }, { "name": "Prefer", "value": "return=representation,resolution=merge-duplicates" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"digest_date\": \"{{ $now.minus(1, 'day').toFormat('yyyy-MM-dd') }}\",\n  \"total_payments\": {{ $json.total }},\n  \"successful_payments\": {{ $json.confirmed }},\n  \"failed_payments\": {{ $json.failed }},\n  \"total_amount_cents\": {{ Math.round($json.totalVolume * 100) }},\n  \"success_rate\": {{ $json.successRate }},\n  \"top_errors\": {{ JSON.stringify(Object.entries($json.errorCounts).map(([code, count]) => ({code, count}))) }}\n}",
+        "options": {}
+      },
+      "id": "store-digest",
+      "name": "Store in Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1380, 300]
+    }
+  ],
+  "connections": {
+    "Every Day 08:00 CET": { "main": [[ { "node": "Get All Accounts", "type": "main", "index": 0 }, { "node": "Get Yesterday's Payments", "type": "main", "index": 0 }, { "node": "Get Reconciliation Stats", "type": "main", "index": 0 } ]] },
+    "Get All Accounts": { "main": [[ { "node": "Calculate Stats", "type": "main", "index": 0 } ]] },
+    "Get Yesterday's Payments": { "main": [[ { "node": "Calculate Stats", "type": "main", "index": 0 } ]] },
+    "Get Reconciliation Stats": { "main": [[ { "node": "Calculate Stats", "type": "main", "index": 0 } ]] },
+    "Calculate Stats": { "main": [[ { "node": "Generate HTML Report", "type": "main", "index": 0 } ]] },
+    "Generate HTML Report": { "main": [[ { "node": "Email Daily Report", "type": "main", "index": 0 } ]] },
+    "Email Daily Report": { "main": [[ { "node": "Store in Supabase", "type": "main", "index": 0 } ]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [{ "name": "devengo" }, { "name": "reporting" }]
+}
